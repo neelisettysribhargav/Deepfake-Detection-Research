@@ -9,7 +9,7 @@ data/
 
 checkpoints/
 
-experiments/*
+experiments/
 
 debug/
 
