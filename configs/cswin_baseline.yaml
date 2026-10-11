@@ -1,0 +1,73 @@
+experiment:
+  name: cswin_scratch_v2
+
+
+model:
+  name: CSWin_64_24322_small_256
+  num_classes: 1
+  pretrained: false
+  checkpoint: null
+  drop_rate: 0.1 # Paper Section 3.1: Dropout rate between 0.5 and 0.1 to prevent overfitting
+
+
+data:
+  root: data/Dataset-1
+  image_size: 256 # Paper Section 2.1: All images sized at 256 x 256 pixels
+
+  train_subsets:
+    - Data Set 1
+    - Data Set 2
+    - Data Set 3
+    - Data Set 4
+
+  val_subsets:
+    - Data Set 1
+    - Data Set 2
+    - Data Set 3
+    - Data Set 4
+
+  test_subsets:
+    dataset_all:
+      - Data Set 1
+      - Data Set 2
+      - Data Set 3
+      - Data Set 4
+    dataset_1:
+      - Data Set 1
+    dataset_2:
+      - Data Set 2
+    dataset_3:
+      - Data Set 3
+    dataset_4:
+      - Data Set 4
+
+
+training:
+  epochs: 30
+  batch_size: 32
+  val_batch_size: 64
+  num_workers: 4
+  optimizer: Adam # Paper Section 3.1: ADAM optimizer
+  learning_rate: 0.001 # Paper Section 3.1: Fixed learning rate of 0.001
+  weight_decay: 0.0001
+  loss: BCEWithLogitsLoss # Paper Section 3.1: Binary Cross-Entropy Loss
+  scheduler: cosine # Or 'none' for constant lr=0.001
+
+
+hardware:
+  device: cuda
+
+
+resume:
+  enabled: true # Set to true to resume training from an existing 256x256 checkpoint
+  checkpoint: experiments/checkpoints/cswin_scratch_v2/last.pth
+
+
+logging:
+  verbose: false
+
+
+paths:
+  checkpoint_dir: experiments/checkpoints
+  log_dir: experiments/logs
+  result_dir: experiments/results
