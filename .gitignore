@@ -9,6 +9,8 @@ data/
 
 checkpoints/
 
+experiments/*
+
 debug/
 
 Microsoft/
