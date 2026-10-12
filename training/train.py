@@ -1,11 +1,12 @@
 import sys
 import os
 import time
+import warnings
 from tqdm import tqdm
 import yaml
 import torch
 from torch.utils.data import DataLoader
-from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -16,11 +17,66 @@ from utils.seed import set_seed
 from utils.checkpoint import save_checkpoint, load_checkpoint
 from utils.logger import save_history
 
-torch.backends.cudnn.benchmark = True
 set_seed(42)
+torch.backends.cudnn.deterministic = False
+torch.backends.cudnn.benchmark = True
+
+def build_optimizer(model, config):
+    opt_type = config["training"].get("optimizer", "AdamW").lower()
+    lr = float(config["training"]["learning_rate"])
+    weight_decay = float(config["training"].get("weight_decay", 0.05))
+
+    if opt_type == "adamw":
+        print(f"Using AdamW Optimizer (lr={lr}, weight_decay={weight_decay})")
+        optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+    else:
+        print(f"Using Adam Optimizer (lr={lr}, weight_decay={weight_decay})")
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+
+    for param_group in optimizer.param_groups:
+        param_group["initial_lr"] = lr
+
+    return optimizer
+
+def build_scheduler(optimizer, config, total_epochs, start_epoch=0):
+    scheduler_type = config["training"].get("scheduler", "cosine")
+    warmup_epochs = config["training"].get("warmup_epochs", 0)
+
+    if scheduler_type == "cosine":
+        if warmup_epochs > 0 and warmup_epochs < total_epochs:
+            warmup_scheduler = LinearLR(
+                optimizer,
+                start_factor=0.01,
+                end_factor=1.0,
+                total_iters=warmup_epochs
+            )
+            cosine_scheduler = CosineAnnealingLR(
+                optimizer,
+                T_max=(total_epochs - warmup_epochs),
+                eta_min=1e-6
+            )
+            scheduler = SequentialLR(
+                optimizer,
+                schedulers=[warmup_scheduler, cosine_scheduler],
+                milestones=[warmup_epochs]
+            )
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=UserWarning)
+                for _ in range(start_epoch):
+                    scheduler.step()
+            return scheduler
+        else:
+            scheduler = CosineAnnealingLR(optimizer, T_max=total_epochs, eta_min=1e-6)
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=UserWarning)
+                for _ in range(start_epoch):
+                    scheduler.step()
+            return scheduler
+    else:
+        return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: 1.0)
 
 def main():
-    config_path = "configs/cswin_baseline.yaml"
+    config_path = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1].endswith(('.yaml', '.yml')) else "configs/cswin_baseline.yaml"
     with open(config_path, "r") as file:
         config = yaml.safe_load(file)
 
@@ -56,13 +112,16 @@ def main():
     val_batch_size = config["training"].get("val_batch_size", batch_size * 2)
     num_workers = config["training"]["num_workers"]
 
+    prefetch_factor = 2 if num_workers > 0 else None
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
         shuffle=True,
         num_workers=num_workers,
         pin_memory=True if torch.cuda.is_available() else False,
-        persistent_workers=True if num_workers > 0 else False
+        persistent_workers=True if num_workers > 0 else False,
+        prefetch_factor=prefetch_factor
     )
 
     val_loader = DataLoader(
@@ -71,19 +130,22 @@ def main():
         shuffle=False,
         num_workers=num_workers,
         pin_memory=True if torch.cuda.is_available() else False,
-        persistent_workers=True if num_workers > 0 else False
+        persistent_workers=True if num_workers > 0 else False,
+        prefetch_factor=prefetch_factor
     )
 
     # Model instantiation (CSWin-Small: 35M parameters, 256x256 resolution)
     num_classes = config["model"]["num_classes"]
     drop_rate = config["model"].get("drop_rate", 0.1)
+    drop_path_rate = config["model"].get("drop_path_rate", 0.1)
 
     model = get_model(
         config["model"]["name"],
         num_classes=num_classes,
         pretrained=config["model"]["pretrained"],
         checkpoint=config["model"].get("checkpoint"),
-        drop_rate=drop_rate
+        drop_rate=drop_rate,
+        drop_path_rate=drop_path_rate
     )
     model = model.to(device)
 
@@ -95,55 +157,57 @@ def main():
         criterion = torch.nn.CrossEntropyLoss()
         print("Using Multi-Class Cross-Entropy Loss")
 
-    # Optimizer (Section 3.1: ADAM optimizer with learning rate 0.001)
-    lr = config["training"]["learning_rate"]
-    weight_decay = config["training"].get("weight_decay", 0.0001)
-
-    optimizer = torch.optim.Adam(
-        model.parameters(),
-        lr=lr,
-        weight_decay=weight_decay
-    )
-
-    scheduler_type = config["training"].get("scheduler", "cosine")
-    if scheduler_type == "cosine":
-        scheduler = CosineAnnealingLR(optimizer, T_max=config["training"]["epochs"], eta_min=1e-6)
-    else:
-        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: 1.0)
-
+    optimizer = build_optimizer(model, config)
     scaler = torch.amp.GradScaler("cuda", enabled=torch.cuda.is_available())
 
     start_epoch = 0
     best_f1 = 0.0
+    total_epochs = config["training"]["epochs"]
 
     # Resuming checkpoint
     resume_cfg = config.get("resume", {})
-    total_epochs = config["training"]["epochs"]
 
     if resume_cfg.get("enabled", False) and os.path.exists(resume_cfg.get("checkpoint", "")):
-        last_epoch, best_f1 = load_checkpoint(
-            resume_cfg["checkpoint"],
-            model,
-            optimizer,
-            scheduler=None,  # Re-initialize scheduler with correct total_epochs
-            scaler=scaler,
-            device=device
-        )
-        start_epoch = last_epoch
+        ckpt_path = resume_cfg["checkpoint"]
+        weights_only = resume_cfg.get("weights_only", False)
 
-        base_lr = config["training"]["learning_rate"]
-        for param_group in optimizer.param_groups:
-            param_group["initial_lr"] = base_lr
+        if weights_only:
+            ckpt = torch.load(ckpt_path, map_location=device, weights_only=True)
+            model.load_state_dict(ckpt["model_state_dict"])
+            start_epoch = int(ckpt.get("epoch", 0))
+            best_f1 = float(ckpt.get("best_f1", ckpt.get("metric", 0.0)))
 
-        if scheduler_type == "cosine":
-            scheduler = CosineAnnealingLR(optimizer, T_max=total_epochs, eta_min=1e-6, last_epoch=start_epoch)
+            base_lr = float(config["training"]["learning_rate"])
+            for param_group in optimizer.param_groups:
+                param_group["lr"] = base_lr
+                param_group["initial_lr"] = base_lr
+
+            scheduler = build_scheduler(optimizer, config, total_epochs, start_epoch=start_epoch)
+            current_lr = optimizer.param_groups[0]["lr"]
+            print(f"Resumed weights only from {ckpt_path} (epoch {start_epoch}) with fresh optimizer (Learning Rate: {current_lr:.6f})")
         else:
-            scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: 1.0, last_epoch=start_epoch)
+            last_epoch, best_f1 = load_checkpoint(
+                ckpt_path,
+                model,
+                optimizer,
+                scheduler=None,  # Re-initialize scheduler with correct total_epochs
+                scaler=scaler,
+                device=device
+            )
+            start_epoch = last_epoch
 
-        current_lr = optimizer.param_groups[0]["lr"]
-        print(f"Resumed training from epoch {start_epoch + 1}/{total_epochs} (Learning Rate: {current_lr:.6f}, Best F1: {best_f1:.4f})")
+            base_lr = config["training"]["learning_rate"]
+            for param_group in optimizer.param_groups:
+                param_group["initial_lr"] = base_lr
+
+            scheduler = build_scheduler(optimizer, config, total_epochs, start_epoch=start_epoch)
+
+            current_lr = optimizer.param_groups[0]["lr"]
+            print(f"Resumed training from epoch {start_epoch + 1}/{total_epochs} (Learning Rate: {current_lr:.6f}, Best F1: {best_f1:.4f})")
     else:
-        print(f"Starting training from scratch ({total_epochs} epochs)")
+        scheduler = build_scheduler(optimizer, config, total_epochs, start_epoch=0)
+        warmup_ep = config["training"].get("warmup_epochs", 0)
+        print(f"Starting training from scratch ({total_epochs} epochs, {warmup_ep} warmup epochs)")
 
     for epoch in range(start_epoch, total_epochs):
         start_time = time.time()
@@ -151,7 +215,9 @@ def main():
             torch.cuda.reset_peak_memory_stats()
         model.train()
 
-        running_loss = 0.0
+        running_loss = torch.tensor(0.0, device=device)
+        running_correct = 0
+        running_total = 0
 
         progress_bar = tqdm(
             train_loader,
@@ -164,11 +230,11 @@ def main():
             file=sys.stdout
         )
 
-        for images, labels in progress_bar:
+        for batch_idx, (images, labels) in enumerate(progress_bar):
             images = images.to(device, non_blocking=True)
             labels_device = labels.to(device, non_blocking=True)
 
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
 
             with torch.amp.autocast("cuda", enabled=torch.cuda.is_available()):
                 outputs = model(images)
@@ -180,24 +246,44 @@ def main():
                     loss = criterion(outputs, targets_tensor)
 
             scaler.scale(loss).backward()
+
+            grad_clip = config["training"].get("grad_clip", 1.0)
+            if grad_clip is not None and grad_clip > 0:
+                scaler.unscale_(optimizer)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=grad_clip)
+
             scaler.step(optimizer)
             scaler.update()
 
-            running_loss += loss.item()
-            progress_bar.set_postfix(
-                loss=f"{loss.item():.4f}",
-                lr=f"{optimizer.param_groups[0]['lr']:.6f}"
-            )
+            with torch.no_grad():
+                if num_classes == 1:
+                    preds = (outputs.detach() > 0.0).long().view(-1)
+                else:
+                    preds = outputs.detach().argmax(dim=1)
+                running_correct += (preds == labels_device).sum().item()
+                running_total += labels_device.numel()
+
+            running_loss += loss.detach()
+
+            if batch_idx % 20 == 0 or (batch_idx + 1) == len(train_loader):
+                cur_avg_loss = (running_loss / (batch_idx + 1)).item()
+                cur_acc = (running_correct / max(1, running_total)) * 100
+                progress_bar.set_postfix(
+                    loss=f"{cur_avg_loss:.4f}",
+                    acc=f"{cur_acc:.1f}%",
+                    lr=f"{optimizer.param_groups[0]['lr']:.6f}"
+                )
 
         progress_bar.close()
-        train_loss = running_loss / len(train_loader) if len(train_loader) > 0 else 0.0
+        train_loss = (running_loss / len(train_loader)).item() if len(train_loader) > 0 else 0.0
+        train_acc = running_correct / max(1, running_total)
 
         # Validation on holdout validation set
         metrics = validate(model, val_loader, criterion, device)
         scheduler.step()
 
         print(f"\n--- Epoch {epoch+1}/{total_epochs} ---")
-        print(f"Train Loss : {train_loss:.4f} | Val Loss: {metrics['loss']:.4f}")
+        print(f"Train Loss : {train_loss:.4f} | Train Acc: {train_acc * 100:.2f}% | Val Loss: {metrics['loss']:.4f}")
         print(f"Accuracy   : {metrics['accuracy'] * 100:.2f}%")
         print(f"Sensitivity (Sn - Real): {metrics['sensitivity'] * 100:.2f}%")
         print(f"Specificity (Sp - Fake): {metrics['specificity'] * 100:.2f}%")
@@ -241,10 +327,20 @@ def main():
         epoch_time = (time.time() - start_time) / 60
         print(f"Epoch Time : {epoch_time:.2f} minutes")
 
+        # Periodic snapshot saving if save_every > 0
+        save_every = int(config["training"].get("save_every", 0))
+        if save_every > 0 and (epoch + 1) % save_every == 0:
+            os.makedirs(checkpoint_dir, exist_ok=True)
+            torch.save(
+                {"model_state_dict": model.state_dict(), "epoch": epoch + 1},
+                f"{checkpoint_dir}/weights_epoch_{epoch + 1:03d}.pth"
+            )
+
         # Save History to CSV
         history = {
             "epoch": epoch + 1,
             "train_loss": train_loss,
+            "train_acc": train_acc,
             "val_loss": metrics["loss"],
             "accuracy": metrics["accuracy"],
             "sensitivity": metrics["sensitivity"],

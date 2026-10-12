@@ -38,6 +38,9 @@ class DeepfakeDataset(Dataset):
                     continue
 
                 for image_name in os.listdir(class_path):
+                    # Only load the author's official 190,335 benchmark images:
+                    if not image_name.startswith(("real_", "fake_")):
+                        continue
                     image_path = os.path.join(class_path, image_name)
                     self.samples.append((image_path, label, subset))
 

@@ -24,12 +24,14 @@ def main():
 
     num_classes = config["model"]["num_classes"]
     drop_rate = config["model"].get("drop_rate", 0.1)
+    drop_path_rate = config["model"].get("drop_path_rate", 0.1)
 
     model = get_model(
         config["model"]["name"],
         num_classes=num_classes,
         pretrained=False,
-        drop_rate=drop_rate
+        drop_rate=drop_rate,
+        drop_path_rate=drop_path_rate
     )
 
     checkpoint_dir = f"{config['paths']['checkpoint_dir']}/{exp_name}"

@@ -1,5 +1,5 @@
 experiment:
-  name: cswin_scratch_v2
+  name: cswin_scratch_v3
 
 
 model:
@@ -8,6 +8,7 @@ model:
   pretrained: false
   checkpoint: null
   drop_rate: 0.1 # Paper Section 3.1: Dropout rate between 0.5 and 0.1 to prevent overfitting
+  drop_path_rate: 0.1 # Stochastic depth regularization for Transformer blocks
 
 
 data:
@@ -43,15 +44,18 @@ data:
 
 
 training:
-  epochs: 30
+  epochs: 10
   batch_size: 32
   val_batch_size: 64
   num_workers: 4
-  optimizer: Adam # Paper Section 3.1: ADAM optimizer
-  learning_rate: 0.001 # Paper Section 3.1: Fixed learning rate of 0.001
-  weight_decay: 0.0001
+  optimizer: AdamW # Decoupled weight decay for Vision Transformers
+  learning_rate: 0.00003
+  weight_decay: 0.05 # Decoupled weight decay for AdamW
+  warmup_epochs: 0 # 2-epoch linear warmup for stable scratch training
+  grad_clip: 1.0 # Gradient clipping to prevent AMP gradient spikes
   loss: BCEWithLogitsLoss # Paper Section 3.1: Binary Cross-Entropy Loss
-  scheduler: cosine # Or 'none' for constant lr=0.001
+  scheduler: cosine # Cosine annealing schedule after warmup
+  save_every: 0 # Snapshots every N epochs (0 = only best.pth and last.pth)
 
 
 hardware:
@@ -60,7 +64,8 @@ hardware:
 
 resume:
   enabled: true # Set to true to resume training from an existing 256x256 checkpoint
-  checkpoint: experiments/checkpoints/cswin_scratch_v2/last.pth
+  checkpoint: experiments/checkpoints/cswin_scratch_v3/best.pth
+  weights_only: true # Set to true to load model weights only and restart optimizer with fresh learning rate
 
 
 logging:

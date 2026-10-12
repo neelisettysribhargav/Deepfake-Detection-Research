@@ -123,12 +123,11 @@ class LePEAttention(nn.Module):
         k, _ = self.im2cswin(k)
         v, lepe = self.get_lepe(v, self.get_v)
 
-        q = q * self.scale
-        attn = (q @ k.transpose(-2, -1))
-        attn = nn.functional.softmax(attn, dim=-1, dtype=attn.dtype)
-        attn = self.attn_drop(attn)
-
-        x = (attn @ v) + lepe
+        dropout_p = self.attn_drop.p if self.training else 0.0
+        attn_out = nn.functional.scaled_dot_product_attention(
+            q, k, v, scale=self.scale, dropout_p=dropout_p
+        )
+        x = attn_out + lepe
         x = x.transpose(1, 2).reshape(-1, self.H_sp * self.W_sp, C)
 
         # Window to Image with unpadding

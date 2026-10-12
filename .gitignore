@@ -9,8 +9,6 @@ data/
 
 checkpoints/
 
-experiments/
-
 debug/
 
 Microsoft/
@@ -19,4 +17,6 @@ project_tree.txt
 
 Project.zip
 Project-2.zip
+
 Notes.txt
+cswin_recipe_revert_map.md
