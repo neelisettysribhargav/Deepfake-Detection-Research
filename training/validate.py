@@ -1,5 +1,6 @@
 import sys
 import torch
+import numpy as np
 from tqdm import tqdm
 from evaluation.metrics import calculate_metrics
 
@@ -54,6 +55,15 @@ def validate(model, loader, criterion, device, return_predictions=False, desc="V
 
     progress_bar.close()
     avg_loss = (running_loss / len(loader)).item() if len(loader) > 0 else 0.0
+
+    if len(predictions) == 0:
+        empty_metrics = {
+            "loss": 0.0, "accuracy": 0.0, "sensitivity": 0.0,
+            "specificity": 0.0, "precision": 0.0, "recall": 0.0, "f1": 0.0
+        }
+        if return_predictions:
+            return empty_metrics, np.array([]), np.array([])
+        return empty_metrics
 
     # Single bulk PCIe transfer at the very end
     all_predictions = torch.cat(predictions).cpu().numpy()

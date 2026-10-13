@@ -44,12 +44,12 @@ data:
 
 
 training:
-  epochs: 10
+  epochs: 20
   batch_size: 32
   val_batch_size: 64
   num_workers: 4
   optimizer: AdamW # Decoupled weight decay for Vision Transformers
-  learning_rate: 0.00003
+  learning_rate: 0.00001
   weight_decay: 0.05 # Decoupled weight decay for AdamW
   warmup_epochs: 0 # 2-epoch linear warmup for stable scratch training
   grad_clip: 1.0 # Gradient clipping to prevent AMP gradient spikes
@@ -64,7 +64,7 @@ hardware:
 
 resume:
   enabled: true # Set to true to resume training from an existing 256x256 checkpoint
-  checkpoint: experiments/checkpoints/cswin_scratch_v3/best.pth
+  checkpoint: experiments/checkpoints/cswin_scratch_v3/last.pth
   weights_only: true # Set to true to load model weights only and restart optimizer with fresh learning rate
 
 

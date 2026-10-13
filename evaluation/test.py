@@ -68,6 +68,10 @@ def main():
             transform=get_test_transform(config["data"]["image_size"])
         )
 
+        if len(test_dataset) == 0:
+            print(f"Skipping {dataset_name}: 0 benchmark test samples found (Table 1 test set is distributed across Data Sets 1, 3, and 4).")
+            continue
+
         test_loader = DataLoader(
             test_dataset,
             batch_size=config["training"]["batch_size"],
