@@ -13,7 +13,7 @@ from models.model_factory import get_model
 from training.validate import validate
 
 def main():
-    config_path = "configs/cswin_baseline.yaml"
+    config_path = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1].endswith(('.yaml', '.yml')) else "configs/cswin_baseline.yaml"
     with open(config_path, "r") as file:
         config = yaml.safe_load(file)
 
@@ -35,14 +35,20 @@ def main():
     )
 
     checkpoint_dir = f"{config['paths']['checkpoint_dir']}/{exp_name}"
-    best_checkpoint_path = f"{checkpoint_dir}/best.pth"
+    candidate_paths = [
+        config["model"].get("checkpoint"),
+        f"{checkpoint_dir}/best_e10_frozen.pth",
+        f"{checkpoint_dir}/best.pth"
+    ]
+    best_checkpoint_path = next((p for p in candidate_paths if p and os.path.exists(p)), None)
 
-    if os.path.exists(best_checkpoint_path):
+    if best_checkpoint_path:
         print(f"Loading best checkpoint from: {best_checkpoint_path}")
         checkpoint = torch.load(best_checkpoint_path, map_location=device, weights_only=True)
-        model.load_state_dict(checkpoint["model_state_dict"])
+        state_dict = checkpoint["model_state_dict"] if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint else checkpoint
+        model.load_state_dict(state_dict)
     else:
-        print(f"Warning: {best_checkpoint_path} not found. Running with current weights.")
+        print("Warning: No checkpoint found. Running with initialized weights.")
 
     model = model.to(device)
     model.eval()

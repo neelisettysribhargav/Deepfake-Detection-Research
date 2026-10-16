@@ -1,5 +1,5 @@
 """
-corruption_prevalence.py
+scripts/measure_noise.py
 
 How common are noisy / corrupted-looking images in each split, subset and class?
 
@@ -13,7 +13,7 @@ Per image it records a robust noise estimate (Immerkaer sigma), Laplacian varian
 size, brightness and saturation. Purely descriptive; nothing is trained or tuned.
 
 Run from the project root:
-  python corruption_prevalence.py --manifest data/manifests/author_data.csv --out experiments/inspect
+  python scripts/measure_noise.py --manifest data/manifests/author_data.csv --out experiments/inspect
 
 Options: --max-per-group N  (default 3000; use 0 for every image, slower)
 Outputs: image_features.csv, prevalence_summary.csv

@@ -1,16 +1,16 @@
 """
-inspect_consensus_misses.py
+scripts/inspect_misses.py
 
 Which test REAL images do every model call fake, and what do they look like?
 
-Reads the per-image prediction files written by eval_predictions.py, finds test reals that
+Reads the per-image prediction files written by scripts/evaluate.py, finds test reals that
 ALL listed models classify as fake (prob < threshold) and test reals that ALL classify as real,
 then compares them (and train / validation reals) on simple image statistics and writes
 contact sheets so you can look at them.
 
 Run from the project root (paths in the prediction files are relative to it):
 
-  python inspect_consensus_misses.py ^
+  python scripts/inspect_misses.py ^
       --preds experiments/predictions/cswin_pre_a_predictions.csv ^
               experiments/predictions/convnext_tiny_pre_predictions.csv ^
               experiments/predictions/xception_pre_predictions.csv ^

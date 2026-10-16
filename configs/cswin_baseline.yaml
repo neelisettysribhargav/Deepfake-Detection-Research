@@ -52,10 +52,10 @@ training:
   optimizer: AdamW # Decoupled weight decay for Vision Transformers
   learning_rate: 0.00001
   weight_decay: 0.05 # Decoupled weight decay for AdamW
-  warmup_epochs: 0 # 2-epoch linear warmup for stable scratch training
+  warmup_epochs: 0 # 0 warmup epochs for canonical scratch training
   grad_clip: 1.0 # Gradient clipping to prevent AMP gradient spikes
   loss: BCEWithLogitsLoss # Paper Section 3.1: Binary Cross-Entropy Loss
-  scheduler: cosine # Cosine annealing schedule after warmup
+  scheduler: cosine # Cosine annealing schedule
   save_every: 0 # Snapshots every N epochs (0 = only best.pth and last.pth)
 
 
@@ -64,9 +64,9 @@ hardware:
 
 
 resume:
-  enabled: true # Set to true to resume training from an existing 256x256 checkpoint
-  checkpoint: experiments/checkpoints/cswin_scratch_v3/last.pth
-  weights_only: true # Set to true to load model weights only and restart optimizer with fresh learning rate
+  enabled: false # Set to true to resume training from an existing checkpoint
+  checkpoint: experiments/checkpoints/cswin_scratch_v3/best_e10_frozen.pth
+  weights_only: false # Set to true to load model weights only and restart optimizer with fresh learning rate
 
 
 logging:

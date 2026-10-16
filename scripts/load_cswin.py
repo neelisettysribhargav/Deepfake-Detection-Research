@@ -1,5 +1,5 @@
 """
-load_pretrained_cswin.py
+scripts/load_cswin.py
 
 Loads the OFFICIAL ImageNet-1K CSWin-S (224x224, 35M params) checkpoint from the Microsoft
 CSWin-Transformer repo into this project's CSWin_64_24322_small_256 model.
@@ -16,8 +16,8 @@ were NOT initialised from the checkpoint, and any shape mismatches. The only mod
 that should remain un-loaded are head.weight and head.bias.
 
 Usage (from the project root):
-  python load_pretrained_cswin.py --weights path/to/cswin_small_224.pth
-  python load_pretrained_cswin.py --weights path/to/cswin_small_224.pth --out cswin_s_imagenet_init.pth
+  python scripts/load_cswin.py --weights path/to/cswin_small_224.pth
+  python scripts/load_cswin.py --weights path/to/cswin_small_224.pth --out cswin_s_imagenet_init.pth
 
 Only load checkpoint files you downloaded from the official repo (older torch.load falls back
 to pickle for non-tensor entries).

@@ -8,7 +8,7 @@ def main():
         type=str,
         default="train",
         choices=["train", "test", "tune", "finetune"],
-        help="Pipeline mode to execute: 'train' (100 epochs from scratch), 'test' (evaluate on test set), 'tune' (Bayesian optimization), 'finetune' (DFDC transfer learning)"
+        help="Pipeline mode to execute: 'train' (train CSWin model), 'test' (evaluate on test set), 'tune' (Bayesian optimization), 'finetune' (DFDC transfer learning)"
     )
     args = parser.parse_args()
 

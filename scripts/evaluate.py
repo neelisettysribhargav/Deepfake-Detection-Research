@@ -1,5 +1,5 @@
 """
-eval_predictions.py
+scripts/evaluate.py
 
 One evaluation path for every number you report.
 
@@ -10,8 +10,8 @@ come from the same weights, the same preprocessing and the same threshold.
 
 Run from the project root, e.g.:
 
-  python eval_predictions.py ^
-      --checkpoint experiments/checkpoints/cswin_scratch_v3/best.pth ^
+  python scripts/evaluate.py ^
+      --checkpoint experiments/checkpoints/cswin_scratch_v3/best_e10_frozen.pth ^
       --tag e10 ^
       --dedup-manifest data/manifests/author_data_val_dedup.csv
 

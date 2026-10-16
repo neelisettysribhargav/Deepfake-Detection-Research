@@ -1,5 +1,5 @@
 """
-finetune_pretrained.py
+scripts/finetune.py
 
 Fine-tunes an ImageNet-pretrained model on the frozen author_data manifest (full train split)
 and selects the checkpoint on DEDUPLICATED validation. The test set is never touched here.
@@ -7,7 +7,7 @@ and selects the checkpoint on DEDUPLICATED validation. The test set is never tou
 Architectures:
   cswin_pretrained   project CSWin-S initialised from the official ImageNet-1K checkpoint
                      (--weights path/to/cswin_small_224.pth; check it first with
-                     load_pretrained_cswin.py)
+                     scripts/load_cswin.py)
   convnext_tiny | xception | inception_v3   pretrained models from get_model(..., pretrained=True)
 
 Recipe (standard fine-tuning, no image augmentation): AdamW, backbone LR --lr, head LR x10,
@@ -15,10 +15,10 @@ per-iteration linear warmup + cosine decay, weight decay 0.05 (not on bias/norm)
 clipping 1.0, fp16 autocast, optional label smoothing and EMA of weights.
 
 First pass to see whether it works (about half the cost of an epoch-equivalent each):
-  python finetune_pretrained.py --arch cswin_pretrained --weights cswin_small_224.pth ^
+  python scripts/finetune.py --arch cswin_pretrained --weights cswin_small_224.pth ^
       --epochs 3 --train-fraction 0.5 --name cswin_pre_a
 
-Then evaluate the chosen checkpoint ONCE on test with eval_predictions.py (command is printed).
+Then evaluate the chosen checkpoint ONCE on test with scripts/evaluate.py (command is printed).
 """
 
 import os
