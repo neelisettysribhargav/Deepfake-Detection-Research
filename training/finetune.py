@@ -39,10 +39,11 @@ def main():
 
     # 1. Load 20% subset of Deepfake Face Detection training dataset (Dataset-1)
     full_ds1 = DeepfakeDataset(
-        root_dir=config["data"]["root"],
+        root_dir=config["data"].get("root"),
         subsets=config["data"]["train_subsets"],
         split="train",
-        transform=get_train_transform(image_size)
+        transform=get_train_transform(image_size),
+        manifest_path=config["data"].get("manifest", None)
     )
     n_20pct = int(0.20 * len(full_ds1))
     indices_20 = np.random.choice(len(full_ds1), size=n_20pct, replace=False)

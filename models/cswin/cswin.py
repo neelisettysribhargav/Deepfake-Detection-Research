@@ -62,12 +62,21 @@ class CSWinTransformer(nn.Module):
     def __init__(self, img_size=256, patch_size=4, in_chans=3, num_classes=1, embed_dim=64,
                  depth=[2, 4, 32, 2], split_size=[1, 2, 8, 8], num_heads=[2, 4, 8, 16],
                  mlp_ratio=4., qkv_bias=True, qk_scale=None, drop_rate=0.1, attn_drop_rate=0.,
-                 drop_path_rate=0., norm_layer=nn.LayerNorm, use_chk=False):
+                 drop_path_rate=0., norm_layer=nn.LayerNorm, use_chk=False,
+                 act='gelu', block_drop_rate=None, head_drop_rate=None, use_pos_embed=False):
         super().__init__()
+        # Variant options (defaults reproduce the current model exactly):
+        #   act: 'gelu' (official CSWin) or 'relu' (paper text, Section 2.2.1 b)
+        #   block_drop_rate: dropout inside every block's MLP (None -> drop_rate)
+        #   head_drop_rate:  dropout before the classifier   (None -> drop_rate)
+        act_layer = {'gelu': nn.GELU, 'relu': nn.ReLU}[str(act).lower()]
+        block_drop_rate = drop_rate if block_drop_rate is None else block_drop_rate
+        head_drop_rate = drop_rate if head_drop_rate is None else head_drop_rate
         self.use_chk = use_chk
         self.num_classes = num_classes
         self.num_features = self.embed_dim = embed_dim
         self.img_size = img_size
+        self.use_pos_embed = use_pos_embed
         heads = num_heads
 
         # Stage 1: Conv embedding (H/4, W/4)
@@ -78,6 +87,13 @@ class CSWinTransformer(nn.Module):
             norm_layer=norm_layer
         )
 
+        if self.use_pos_embed:
+            num_patches = (img_size // patch_size) * (img_size // patch_size)
+            self.pos_embed = nn.Parameter(torch.zeros(1, num_patches, embed_dim))
+            trunc_normal_(self.pos_embed, std=0.02)
+        else:
+            self.pos_embed = None
+
         curr_dim = embed_dim
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, np.sum(depth))]
 
@@ -86,7 +102,7 @@ class CSWinTransformer(nn.Module):
             CSWinBlock(
                 dim=curr_dim, num_heads=heads[0], reso=img_size // 4, mlp_ratio=mlp_ratio,
                 qkv_bias=qkv_bias, qk_scale=qk_scale, split_size=split_size[0],
-                drop=drop_rate, attn_drop=attn_drop_rate,
+                drop=block_drop_rate, attn_drop=attn_drop_rate, act_layer=act_layer,
                 drop_path=dpr[i], norm_layer=norm_layer)
             for i in range(depth[0])])
 
@@ -97,7 +113,7 @@ class CSWinTransformer(nn.Module):
             CSWinBlock(
                 dim=curr_dim, num_heads=heads[1], reso=img_size // 8, mlp_ratio=mlp_ratio,
                 qkv_bias=qkv_bias, qk_scale=qk_scale, split_size=split_size[1],
-                drop=drop_rate, attn_drop=attn_drop_rate,
+                drop=block_drop_rate, attn_drop=attn_drop_rate, act_layer=act_layer,
                 drop_path=dpr[np.sum(depth[:1]) + i], norm_layer=norm_layer)
             for i in range(depth[1])])
 
@@ -108,7 +124,7 @@ class CSWinTransformer(nn.Module):
             CSWinBlock(
                 dim=curr_dim, num_heads=heads[2], reso=img_size // 16, mlp_ratio=mlp_ratio,
                 qkv_bias=qkv_bias, qk_scale=qk_scale, split_size=split_size[2],
-                drop=drop_rate, attn_drop=attn_drop_rate,
+                drop=block_drop_rate, attn_drop=attn_drop_rate, act_layer=act_layer,
                 drop_path=dpr[np.sum(depth[:2]) + i], norm_layer=norm_layer)
             for i in range(depth[2])])
 
@@ -119,7 +135,7 @@ class CSWinTransformer(nn.Module):
             CSWinBlock(
                 dim=curr_dim, num_heads=heads[3], reso=img_size // 32, mlp_ratio=mlp_ratio,
                 qkv_bias=qkv_bias, qk_scale=qk_scale, split_size=split_size[-1],
-                drop=drop_rate, attn_drop=attn_drop_rate,
+                drop=block_drop_rate, attn_drop=attn_drop_rate, act_layer=act_layer,
                 drop_path=dpr[np.sum(depth[:-1]) + i], norm_layer=norm_layer, last_stage=True)
             for i in range(depth[-1])])
 
@@ -130,7 +146,7 @@ class CSWinTransformer(nn.Module):
         self.gap = nn.AdaptiveAvgPool1d(1)
 
         # Dropout layer to prevent overfitting (Section 3.1: dropout rate between 0.5 and 0.1)
-        self.head_drop = nn.Dropout(drop_rate) if drop_rate > 0. else nn.Identity()
+        self.head_drop = nn.Dropout(head_drop_rate) if head_drop_rate > 0. else nn.Identity()
 
         # Classification Head (Section 2.2.1 d)
         self.head = nn.Linear(curr_dim, num_classes) if num_classes > 0 else nn.Identity()
@@ -170,6 +186,10 @@ class CSWinTransformer(nn.Module):
         Output: (B, C)
         """
         x = self.stage1_conv_embed(x)
+        if self.use_pos_embed and self.pos_embed is not None:
+            B, H, W, C = x.shape
+            x = (x.view(B, H * W, C) + self.pos_embed).view(B, H, W, C)
+
         for blk in self.stage1:
             x = checkpoint.checkpoint(blk, x) if self.use_chk else blk(x)
 
@@ -203,7 +223,35 @@ def CSWin_64_24322_small_256(pretrained=False, **kwargs):
     - Embed Dim: 64
     - Split Size: [1, 2, 8, 8] (exact mathematical alignment for 256x256 stages: 64, 32, 16, 8)
     - Heads: [2, 4, 8, 16]
+    Supports:
+    - act: 'gelu' or 'relu'
+    - block_drop_rate: float
+    - head_drop_rate: float
     """
+    model = CSWinTransformer(
+        img_size=256,
+        patch_size=4,
+        embed_dim=64,
+        depth=[2, 4, 32, 2],
+        split_size=kwargs.pop('split_size', [1, 2, 8, 8]),
+        num_heads=[2, 4, 8, 16],
+        mlp_ratio=4.,
+        **kwargs
+    )
+    model.default_cfg = default_cfgs['cswin_256']
+    return model
+
+@register_model
+def cswin_paper_faithful_256(pretrained=False, **kwargs):
+    """
+    Paper-faithful variant strictly matching Section 2.2.1(b) / Page 6 of Discover Computing (2025):
+    - ReLU activation in Feed-Forward MLP layers.
+    - Additive 2D positional encodings on patch token embeddings.
+    - 256x256 native input resolution.
+    - Depth: [2, 4, 32, 2], Heads: [2, 4, 8, 16], Embed Dim: 64.
+    """
+    kwargs.setdefault('act', 'relu')
+    kwargs.setdefault('use_pos_embed', True)
     model = CSWinTransformer(
         img_size=256,
         patch_size=4,

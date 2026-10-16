@@ -66,20 +66,23 @@ def main():
     device = torch.device(config["hardware"]["device"] if torch.cuda.is_available() else "cpu")
 
     # Load 10% subset for fast tuning
+    manifest_path = config["data"].get("manifest", None)
     full_train = DeepfakeDataset(
-        root_dir=config["data"]["root"],
+        root_dir=config["data"].get("root"),
         subsets=config["data"]["train_subsets"],
         split="train",
-        transform=get_train_transform(config["data"]["image_size"])
+        transform=get_train_transform(config["data"]["image_size"]),
+        manifest_path=manifest_path
     )
     indices = np.random.choice(len(full_train), size=min(5000, len(full_train)), replace=False)
     train_subset = Subset(full_train, indices)
 
     val_dataset = DeepfakeDataset(
-        root_dir=config["data"]["root"],
+        root_dir=config["data"].get("root"),
         subsets=config["data"]["val_subsets"],
         split="validation",
-        transform=get_test_transform(config["data"]["image_size"])
+        transform=get_test_transform(config["data"]["image_size"]),
+        manifest_path=manifest_path
     )
     val_indices = np.random.choice(len(val_dataset), size=min(1000, len(val_dataset)), replace=False)
     val_subset = Subset(val_dataset, val_indices)

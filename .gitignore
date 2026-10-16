@@ -1,23 +1,16 @@
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-
+# IDE
 .vscode/
 
-data/
+# Python Cache
+__pycache__/
+*.pyc
 
+# Large Model Checkpoints & Datasets (> 100 MB)
 checkpoints/
+*.pth
+data/
+*.zip
 
-debug/
-
-Microsoft/
-
-project_tree.txt
-
-data.zip
-Project.zip
-Project-2.zip
-
-Notes.txt
-cswin_recipe_revert_map.md
+# Local Experiments
+experiments/checkpoints/
+projectLayout.txt

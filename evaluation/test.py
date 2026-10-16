@@ -56,16 +56,19 @@ def main():
     os.makedirs(f"{dest_dir}/confusion_matrix", exist_ok=True)
     os.makedirs(f"{dest_dir}/classification_reports", exist_ok=True)
 
+    manifest_path = config["data"].get("manifest", None)
+
     for dataset_name, subsets in config["data"]["test_subsets"].items():
         print(f"\n==========================================")
         print(f"Testing on {dataset_name} ({subsets})")
         print(f"==========================================")
 
         test_dataset = DeepfakeDataset(
-            root_dir=config["data"]["root"],
+            root_dir=config["data"].get("root"),
             subsets=subsets,
             split="test",
-            transform=get_test_transform(config["data"]["image_size"])
+            transform=get_test_transform(config["data"]["image_size"]),
+            manifest_path=manifest_path
         )
 
         if len(test_dataset) == 0:

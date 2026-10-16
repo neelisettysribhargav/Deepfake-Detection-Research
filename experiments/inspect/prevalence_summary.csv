@@ -1,0 +1,23 @@
+split,subset,class,n,noise_median,noise_p90,kb_median,%noise>6,%noise>10,%noise>15
+test,Data Set 1,fake,1886,1.01,3.43,9.97,3.1,1.0,0.4
+test,Data Set 1,real,2604,0.93,3.58,9.79,4.5,2.2,0.7
+test,Data Set 3,fake,983,1.16,2.84,10.39,1.0,0.2,0.0
+test,Data Set 3,real,206,0.92,3.04,9.71,1.0,0.0,0.0
+test,Data Set 4,fake,2623,1.06,3.28,9.9,2.6,0.9,0.2
+test,Data Set 4,real,2603,0.93,3.08,9.67,3.3,0.7,0.2
+train,Data Set 1,fake,3000,0.83,1.85,9.27,0.3,0.0,0.0
+train,Data Set 1,real,3000,0.64,1.42,8.8,0.0,0.0,0.0
+train,Data Set 2,fake,3000,0.75,1.67,9.02,0.1,0.0,0.0
+train,Data Set 2,real,3000,0.64,1.43,8.78,0.0,0.0,0.0
+train,Data Set 3,fake,3000,0.76,1.65,9.05,0.2,0.1,0.0
+train,Data Set 3,real,3000,0.64,1.36,8.78,0.0,0.0,0.0
+train,Data Set 4,fake,3000,0.69,1.52,8.83,0.0,0.0,0.0
+train,Data Set 4,real,3000,0.64,1.41,8.82,0.0,0.0,0.0
+validation,Data Set 1,fake,3000,1.23,2.23,10.24,0.0,0.0,0.0
+validation,Data Set 1,real,3000,0.68,1.53,8.93,0.0,0.0,0.0
+validation,Data Set 2,fake,1883,1.19,2.66,10.17,0.8,0.3,0.0
+validation,Data Set 2,real,1196,0.63,1.46,8.86,0.0,0.0,0.0
+validation,Data Set 3,fake,3000,1.02,3.22,9.8,3.0,1.0,0.3
+validation,Data Set 3,real,3000,0.66,1.54,8.83,0.0,0.0,0.0
+validation,Data Set 4,fake,3000,1.13,2.44,10.11,1.9,0.9,0.3
+validation,Data Set 4,real,3000,0.84,1.79,9.37,0.0,0.0,0.0

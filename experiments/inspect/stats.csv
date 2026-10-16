@@ -1,0 +1,5 @@
+group,n,brightness_median,brightness_q1,brightness_q3,contrast_median,contrast_q1,contrast_q3,sharpness_median,sharpness_q1,sharpness_q3,saturation_median,saturation_q1,saturation_q3,file_kb_median,file_kb_q1,file_kb_q3
+test_missed,500,131.3,103.79,158.59,48.68,37.23,59.23,887.67,308.18,2254.14,55.81,32.91,91.1,14.07,10.13,17.11
+test_correct,500,118.66,91.86,144.59,53.01,40.65,64.17,190.18,67.24,441.02,66.57,39.02,101.03,9.36,7.4,11.28
+train_reals,500,104.35,80.58,126.33,54.52,46.81,64.33,124.79,54.86,290.31,86.94,65.34,112.32,8.95,7.43,10.4
+val_reals,500,98.08,74.06,121.42,55.04,45.63,64.33,140.27,65.17,323.33,91.41,68.01,119.22,8.95,7.6,10.38

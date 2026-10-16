@@ -90,18 +90,22 @@ def main():
     # Dataset & Preprocessing (Section 2.1: 256x256 image size, no augmentation)
     image_size = config["data"]["image_size"]
 
+    manifest_path = config["data"].get("manifest", None)
+
     train_dataset = DeepfakeDataset(
-        root_dir=config["data"]["root"],
+        root_dir=config["data"].get("root"),
         subsets=config["data"]["train_subsets"],
         split="train",
-        transform=get_train_transform(image_size)
+        transform=get_train_transform(image_size),
+        manifest_path=manifest_path
     )
 
     val_dataset = DeepfakeDataset(
-        root_dir=config["data"]["root"],
+        root_dir=config["data"].get("root"),
         subsets=config["data"]["val_subsets"],
         split="validation",
-        transform=get_test_transform(image_size)
+        transform=get_test_transform(image_size),
+        manifest_path=manifest_path
     )
 
     print(f"Train samples loaded: {len(train_dataset)}")
@@ -134,18 +138,19 @@ def main():
         prefetch_factor=prefetch_factor
     )
 
-    # Model instantiation (CSWin-Small: 35M parameters, 256x256 resolution)
-    num_classes = config["model"]["num_classes"]
-    drop_rate = config["model"].get("drop_rate", 0.1)
-    drop_path_rate = config["model"].get("drop_path_rate", 0.1)
+    # Model instantiation with all forwarded YAML options
+    model_cfg = dict(config["model"])
+    model_name = model_cfg.pop("name")
+    num_classes = model_cfg.pop("num_classes", 1)
+    pretrained = model_cfg.pop("pretrained", False)
+    checkpoint_path = model_cfg.pop("checkpoint", None)
 
     model = get_model(
-        config["model"]["name"],
+        model_name,
         num_classes=num_classes,
-        pretrained=config["model"]["pretrained"],
-        checkpoint=config["model"].get("checkpoint"),
-        drop_rate=drop_rate,
-        drop_path_rate=drop_path_rate
+        pretrained=pretrained,
+        checkpoint=checkpoint_path,
+        **model_cfg
     )
     model = model.to(device)
 
@@ -355,3 +360,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    

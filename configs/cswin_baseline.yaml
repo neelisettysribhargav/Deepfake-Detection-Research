@@ -12,6 +12,7 @@ model:
 
 
 data:
+  manifest: data/manifests/author_data.csv
   root: data/Dataset-1
   image_size: 256 # Paper Section 2.1: All images sized at 256 x 256 pixels
 
