@@ -1,27 +1,30 @@
 """
-run_study.py
+run_study.py  (corrected version)
 
 Automated orchestrator for the Phase 1 9-run robustness study across Arms A, B, and C
 with seeds 1, 2, and 3.
 
 For each run:
-  1. Checks if outputs already exist (idempotent / crash-safe resume).
-  2. Runs `scripts/train_arms.py` (--train-fraction 0.5, 3 epochs).
-  3. Runs `scripts/evaluate.py` (standard test/validation splits).
-  4. Runs `scripts/evaluate_robustness.py` (35-condition paired robustness suite).
-  5. Prints and logs summary metrics.
+  1. Trains (scripts/train_arms.py, --train-fraction 0.5, 3 epochs) unless a COMPLETE run exists.
+  2. Evaluates standard splits (scripts/evaluate.py).
+  3. Evaluates the 35-condition paired robustness suite (scripts/evaluate_robustness.py).
+
+Fixes compared with the first version:
+  * "Training finished" now means history.csv has all epochs. train_arms.py saves last.pth after
+    EVERY epoch, so checking only for last.pth would silently evaluate a half-trained model after
+    a crash, sleep or power cut. An incomplete run is retrained from scratch (train_arms has no resume).
+  * The corruption library must be byte-identical to the frozen copy
+    (robustness/corruptions_frozen_phase1.py), checked before every job.
 
 Usage:
-  # Run the full remaining queue sequentially:
-  python scripts/run_study.py
-
-  # Or run just one arm / seed:
-  python scripts/run_study.py --arm A --seed 1
+  python scripts/run_study.py                    # full remaining queue
+  python scripts/run_study.py --arm A --seed 1   # one job
 """
 
 import os
 import sys
 import time
+import hashlib
 import argparse
 import subprocess
 from datetime import datetime
@@ -29,9 +32,10 @@ from datetime import datetime
 PYTHON = sys.executable
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
+EPOCHS = 3
 
 DEFAULT_RUNS = [
-    ("C", 1),   # (Already completed as pilot; will be verified & skipped)
+    ("C", 1),   # registered from the pilot; verified and skipped
     ("A", 1),
     ("B", 1),
     ("C", 2),
@@ -41,6 +45,32 @@ DEFAULT_RUNS = [
     ("A", 3),
     ("B", 3),
 ]
+
+
+def sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def check_library_frozen():
+    cur = os.path.join(ROOT, "robustness", "corruptions.py")
+    frozen = os.path.join(ROOT, "robustness", "corruptions_frozen_phase1.py")
+    if sha256(cur) != sha256(frozen):
+        sys.exit("ERROR: robustness/corruptions.py differs from corruptions_frozen_phase1.py. "
+                 "The corruption library is frozen; restore it (git checkout phase1_library_frozen -- robustness/corruptions.py).")
+
+
+def training_complete(ckpt_dir, epochs=EPOCHS):
+    last = os.path.join(ckpt_dir, "last.pth")
+    hist = os.path.join(ckpt_dir, "history.csv")
+    if not (os.path.isfile(last) and os.path.isfile(hist)):
+        return False
+    with open(hist, "r", encoding="utf-8") as f:
+        rows = [ln for ln in f if ln.strip()]
+    return (len(rows) - 1) >= epochs          # minus header
 
 
 def run_cmd(cmd, desc):
@@ -56,6 +86,7 @@ def run_cmd(cmd, desc):
 
 
 def process_run(arm, seed, weights, train_fraction):
+    check_library_frozen()
     tag = f"cswin_{arm}_s{seed}"
     ckpt_dir = os.path.join(ROOT, "experiments", "robust_runs", tag)
     last_pth = os.path.join(ckpt_dir, "last.pth")
@@ -66,44 +97,30 @@ def process_run(arm, seed, weights, train_fraction):
     print(f"STARTING STUDY RUN: Arm {arm} | Seed {seed} | Tag: {tag}")
     print("=" * 80)
 
-    # 1. Training
-    if os.path.isfile(last_pth):
-        print(f"Checkpoint already exists at {last_pth}. Skipping training.")
+    if training_complete(ckpt_dir):
+        print(f"Complete training found ({EPOCHS} epochs in history.csv). Skipping training.")
     else:
-        train_cmd = [
-            PYTHON, "scripts/train_arms.py",
-            "--arm", arm,
-            "--seed", str(seed),
-            "--weights", weights,
-            "--train-fraction", str(train_fraction),
-        ]
+        if os.path.isfile(last_pth):
+            print(f"WARNING: {last_pth} exists but history.csv has fewer than {EPOCHS} epochs "
+                  f"(interrupted run). Retraining from scratch.")
+        train_cmd = [PYTHON, "scripts/train_arms.py", "--arm", arm, "--seed", str(seed),
+                     "--weights", weights, "--train-fraction", str(train_fraction)]
         run_cmd(train_cmd, f"Training Arm {arm} (seed {seed})")
 
-    # 2. Standard Evaluation (test / validation splits)
     if os.path.isfile(pred_metrics):
         print(f"Standard metrics already exist at {pred_metrics}. Skipping evaluate.py.")
     else:
-        eval_cmd = [
-            PYTHON, "scripts/evaluate.py",
-            "--checkpoint", last_pth,
-            "--tag", tag,
-            "--model", "CSWin_64_24322_small_256",
-            "--dedup-manifest", "data/manifests/author_data_val_dedup.csv",
-        ]
+        eval_cmd = [PYTHON, "scripts/evaluate.py", "--checkpoint", last_pth, "--tag", tag,
+                    "--model", "CSWin_64_24322_small_256",
+                    "--dedup-manifest", "data/manifests/author_data_val_dedup.csv"]
         run_cmd(eval_cmd, f"Evaluating standard splits for {tag}")
 
-    # 3. Robustness Evaluation (35 conditions)
     if os.path.isfile(rob_metrics):
         print(f"Robustness metrics already exist at {rob_metrics}. Skipping evaluate_robustness.py.")
     else:
-        robust_cmd = [
-            PYTHON, "scripts/evaluate_robustness.py",
-            "--checkpoint", last_pth,
-            "--tag", tag,
-            "--model", "CSWin_64_24322_small_256",
-            "--pool", "data/manifests/robust_pool.csv",
-            "--dfdc", "data/manifests/dfdc_faces.csv",
-        ]
+        robust_cmd = [PYTHON, "scripts/evaluate_robustness.py", "--checkpoint", last_pth, "--tag", tag,
+                      "--model", "CSWin_64_24322_small_256",
+                      "--pool", "data/manifests/robust_pool.csv", "--dfdc", "data/manifests/dfdc_faces.csv"]
         run_cmd(robust_cmd, f"Evaluating 35 robustness conditions for {tag}")
 
     print(f"\n[DONE] Run {tag} fully finished!")
@@ -113,12 +130,13 @@ def process_run(arm, seed, weights, train_fraction):
 
 def main():
     parser = argparse.ArgumentParser(description="Run Phase 1 Study Matrix")
-    parser.add_argument("--arm", choices=["A", "B", "C"], default=None, help="Run only this arm")
-    parser.add_argument("--seed", type=int, choices=[1, 2, 3], default=None, help="Run only this seed")
-    parser.add_argument("--weights", default="checkpoints/cswin/cswin_small_224.pth", help="Pretrained weights")
-    parser.add_argument("--train-fraction", type=float, default=0.5, help="Train fraction per epoch (0.5 = ~24 min/ep)")
+    parser.add_argument("--arm", choices=["A", "B", "C"], default=None)
+    parser.add_argument("--seed", type=int, choices=[1, 2, 3], default=None)
+    parser.add_argument("--weights", default="checkpoints/cswin/cswin_small_224.pth")
+    parser.add_argument("--train-fraction", type=float, default=0.5)
     args = parser.parse_args()
 
+    check_library_frozen()
     if args.arm and args.seed:
         queue = [(args.arm, args.seed)]
     elif args.arm:
@@ -137,7 +155,7 @@ def main():
 
     total_elapsed = (time.time() - total_t0) / 60.0
     print("=" * 80)
-    print(f"ALL SCHEDULED STUDY RUNS COMPLETED in {total_elapsed:.1f} minutes ({total_elapsed/60.0:.2f} hours).")
+    print(f"ALL SCHEDULED STUDY RUNS COMPLETED in {total_elapsed:.1f} minutes ({total_elapsed / 60.0:.2f} hours).")
     print("=" * 80)
 
 

@@ -1,0 +1,22 @@
+{
+  "negative_control": true,
+  "n_samples": 420006,
+  "rate_real": 0.5988390445709229,
+  "rate_fake": 0.4991976320743561,
+  "rate_diff": 0.09964141249656677,
+  "chi2_p": {
+    "any_corruption": 0.0,
+    "lighting": 4.008888037042927e-92,
+    "color_cast": 9.762922223141992e-120,
+    "gaussian_blur": 2.30196087533943e-109,
+    "block_occlusion": 9.703067780190085e-88,
+    "gaussian_noise": 9.260934417802358e-97,
+    "jpeg": 4.483031331600593e-111
+  },
+  "metadata_auc": 0.5494873311568561,
+  "metadata_auc_ci": [
+    0.5463076317945297,
+    0.552378240189827
+  ],
+  "verdict": "FAIL (this is the NEGATIVE CONTROL: FAIL is the correct, expected outcome)"
+}
