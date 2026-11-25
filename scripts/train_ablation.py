@@ -93,14 +93,13 @@ def main():
 
     if known.exclude_types:
         excl = set(known.exclude_types)
-        Base = train_arms.StructuredCorruptor
+        _orig_init = train_arms.StructuredCorruptor.__init__
 
-        class FilteredCorruptor(Base):
-            def __init__(self, *a, **k):
-                super().__init__(*a, **k)
-                self.types = [t for t in self.types if t not in excl]
+        def _filtered_init(self, *a, **k):
+            _orig_init(self, *a, **k)
+            self.types = [t for t in self.types if t not in excl]
 
-        train_arms.StructuredCorruptor = FilteredCorruptor
+        train_arms.StructuredCorruptor.__init__ = _filtered_init
         print(f"[ablation] arm C sampler excludes {sorted(excl)}; remaining types: "
               f"{[t for t in TRAIN_FAMILY if t not in excl]}")
 
@@ -112,7 +111,11 @@ def main():
             if a != "B" or pre is None:
                 return pre, post
             extra = NoiseJpeg(known.bn_prob, known.bn_prob)
-            return (lambda img: extra(pre(img))), post
+            if hasattr(pre, "transforms"):
+                pre.transforms.append(extra)
+                return pre, post
+            from torchvision import transforms as _tv_transforms
+            return _tv_transforms.Compose([pre, extra]), post
 
         train_arms.make_transforms = patched
         print(f"[ablation] arm B gets Gaussian noise and JPEG with probability {known.bn_prob:.4f} each")
