@@ -324,17 +324,25 @@ img_to_process = None
 if uploaded_file is not None:
     img_to_process = Image.open(uploaded_file).convert("RGB")
 elif sample_choice == "Sample 1: Authentic Human (Real)":
-    real_sample_path = "data/Dataset-1/Data Set 1/test/real/real_3526.jpg"
-    if os.path.isfile(real_sample_path):
-        img_to_process = Image.open(real_sample_path).convert("RGB")
-    else:
-        st.warning("Sample file not found at " + real_sample_path)
+    real_sample_paths = ["demo_samples/real_sample.jpg", "data/Dataset-1/Data Set 1/test/real/real_3526.jpg"]
+    found = False
+    for p in real_sample_paths:
+        if os.path.isfile(p):
+            img_to_process = Image.open(p).convert("RGB")
+            found = True
+            break
+    if not found:
+        st.warning("Sample file not found in demo_samples/ or data/Dataset-1/")
 elif sample_choice == "Sample 2: Synthetic Face (Deepfake)":
-    fake_sample_path = "data/Dataset-1/Data Set 1/test/fake/fake_4243.jpg"
-    if os.path.isfile(fake_sample_path):
-        img_to_process = Image.open(fake_sample_path).convert("RGB")
-    else:
-        st.warning("Sample file not found at " + fake_sample_path)
+    fake_sample_paths = ["demo_samples/fake_sample.jpg", "data/Dataset-1/Data Set 1/test/fake/fake_4243.jpg"]
+    found = False
+    for p in fake_sample_paths:
+        if os.path.isfile(p):
+            img_to_process = Image.open(p).convert("RGB")
+            found = True
+            break
+    if not found:
+        st.warning("Sample file not found in demo_samples/ or data/Dataset-1/")
 
 
 # --- INFERENCE PIPELINE ---

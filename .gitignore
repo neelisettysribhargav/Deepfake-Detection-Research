@@ -1,16 +1,51 @@
-# IDE
-.vscode/
+# ==============================================================================
+# Git Ignore Configuration - Deepfake Detection Research
+# ==============================================================================
 
-# Python Cache
+# --- Python Environment & Bytecode ---
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+venv/
+env/
+.venv/
 
-# Large Model Checkpoints & Datasets (> 100 MB)
-checkpoints/
+# --- IDE & OS Cache ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Model Weights & Large Checkpoints (> 100 MB; blocked by GitHub) ---
+# Note: Copy your trained .pth weights to the target machine via USB or Drive.
 *.pth
-data/
-*.zip
-
-# Local Experiments
+*.pt
+*.bin
+*.ckpt
+*.onnx
+checkpoints/
 experiments/checkpoints/
+experiments/robust_runs/**/last.pth
+
+# --- Raw Large Image Datasets (> 10 GB) ---
+data/Dataset-1/
+data/Dataset-2/
+data/raw/
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# --- Large Terminal Logs ---
+*.log
+experiments/*_log.txt
+
+# --- Temporary Scratch Files ---
 project_Layout.txt
+scratch/

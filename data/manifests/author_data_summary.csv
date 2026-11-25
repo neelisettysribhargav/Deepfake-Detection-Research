@@ -1,0 +1,16 @@
+subset,split,fake,real,total
+Data Set 1,train,20001,20001,40002
+Data Set 1,validation,5438,6199,11637
+Data Set 1,test,1886,2604,4490
+Data Set 2,train,10000,10000,20000
+Data Set 2,validation,1883,1196,3079
+Data Set 2,test,0,0,0
+Data Set 3,train,20000,20000,40000
+Data Set 3,validation,6160,6196,12356
+Data Set 3,test,983,206,1189
+Data Set 4,train,20000,20000,40000
+Data Set 4,validation,6160,6196,12356
+Data Set 4,test,2623,2603,5226
+ALL_SUBSETS,train,70001,70001,140002
+ALL_SUBSETS,validation,19641,19787,39428
+ALL_SUBSETS,test,5492,5413,10905

@@ -1,19 +1,26 @@
 # Core Deep Learning Framework
-torch>=2.0
-torchvision>=0.15
+torch>=2.0.0
+torchvision>=0.15.0
 timm>=0.9.16
 
 # Scientific Computing & Data Processing
-numpy>=1.24
-pandas>=2.0
-scipy>=1.10
-scikit-learn>=1.2
+numpy>=1.24.0
+pandas>=2.0.0
+scipy>=1.10.0
+scikit-learn>=1.2.0
 
-# Image Processing & Visualization
-Pillow>=9.5
-matplotlib>=3.7
+# Image Processing & Computer Vision
+Pillow>=9.5.0
+matplotlib>=3.7.0
+opencv-python>=4.8.0
 
-# Experiment Utilities & Optimization
+# Interactive Web Application & Forensic UI
+streamlit>=1.30.0
+
+# Automated Reporting
+python-docx>=1.1.0
+
+# Experiment Utilities, Optimization & Tracking
 PyYAML>=6.0
-tqdm>=4.65
-optuna>=3.0
+tqdm>=4.65.0
+optuna>=3.0.0
